@@ -1,0 +1,91 @@
+
+//+------------------------------------------------------------------+
+//|                                                Pinbar Candle Pattern Alert MT5                                             |
+//|                         Copyright © 2022, Forex Robot Easy Team                 |
+//|                                                 forexroboteasy.com                                                          |
+//+------------------------------------------------------------------+
+
+//--- Indicator input parameters
+input color ArrowColor = clrRed;      // Color of the arrows
+input int ArrowSize = 3;              // Size of the arrows
+input int RsiPeriod = 14;             // Period for RSI calculation
+input int MinWickLengthPercent = 70;  // Minimum Percent of Wick Length
+
+//--- Indicator buffers
+double PinbarBuffer[];
+
+//--- Indicator constants
+enum Pinbar
+{
+    NONE,
+    PINBAR_BULLISH,
+    PINBAR_BEARISH
+};
+
+//+------------------------------------------------------------------+
+//| Custom indicator initialization function                         |
+//+------------------------------------------------------------------+
+int OnInit()
+{
+    //--- Indicator buffers mapping
+    SetIndexBuffer(0, PinbarBuffer);
+
+    //--- Set indicator line properties
+    SetIndexStyle(0, DRAW_ARROW);
+    SetIndexArrow(0, SYMBOL_ARROWUP);
+    SetIndexEmptyValue(0, 0);
+
+    //--- Set indicator parameters
+    SetIndexShift(0, 0);
+    SetIndexLabel(0, 'Pinbar');
+
+    //--- Set up RSI filter
+    IndicatorSetInteger(INDICATOR_DIGITS, 5);
+    IndicatorSetInteger(INDICATOR_LEVELS, 2);
+    IndicatorSetDouble(INDICATOR_LEVELVALUE, 70.0);
+    IndicatorSetString(INDICATOR_LEVELCOLOR, clrRed);
+    IndicatorSetDouble(INDICATOR_LEVELVALUE, 30.0);
+    IndicatorSetString(INDICATOR_LEVELCOLOR, clrGreen);
+    
+    return(INIT_SUCCEEDED);
+}
+
+//+------------------------------------------------------------------+
+//| Custom indicator iteration function                              |
+//+------------------------------------------------------------------+
+int OnCalculate(const int rates_total, const int prev_calculated, const int begin, const double &price[])
+{
+    //--- Check for the presence of enough bars
+    if (rates_total < 3)
+        return(0);
+
+    //--- Calculate the pinbar pattern
+    for (int i = begin; i < rates_total; i++)
+    {
+        double body = MathAbs(price[i] - price[i+1]);
+        double upper_wick = MathAbs(price[i+1] - price[i+2]);
+        double lower_wick = MathAbs(price[i] - price[i+1]);
+
+        //--- Check for pinbar pattern conditions
+        if (body < upper_wick && body < lower_wick && upper_wick > lower_wick)
+        {
+            //--- Calculate RSI
+            double rsi = iRSI(NULL, 0, RsiPeriod, PRICE_CLOSE, i+2);
+            
+            //--- Check for overbought or oversold conditions
+            if (rsi > 70.0 || rsi < 30.0)
+            {
+                //--- Check for minimum wick length condition
+                double min_wick_length = body * MinWickLengthPercent / 100.0;
+                if (upper_wick >= min_wick_length && lower_wick >= min_wick_length)
+                {
+                    //--- Set the pinbar pattern value
+                    PinbarBuffer[i] = (price[i] < price[i+1]) ? PINBAR_BULLISH : PINBAR_BEARISH;
+                }
+            }
+        }
+    }
+    
+    //--- Return the calculated bars
+    return(rates_total);
+}
